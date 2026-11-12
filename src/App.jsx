@@ -5,6 +5,13 @@ const soDigitos = (t) => (t || '').replace(/\D/g, '')
 const zap = (t) => 'https://wa.me/' + soDigitos(t)
 const brl = (n) => Number(n || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const dataBR = (d) => (d ? d.split('-').reverse().join('/') : '')
+const fmtTel = (t) => {
+  let d = soDigitos(t)
+  if (d.startsWith('55') && d.length >= 12) d = d.slice(2)
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
+  return t || ''
+}
 const semAcento = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
 const CAMPOS_CLIENTE = [
@@ -78,22 +85,23 @@ function Formulario({ campos, inicial, onSalvar, onCancelar, onArquivar, salvand
   )
 }
 
-function Lista({ tabela, flag, campos, vazio, prepara, linha, novoRotulo, inicialNovo }) {
+function Lista({ tabela, flag, campos, vazio, prepara, linha, novoRotulo, inicialNovo, busque }) {
   const [itens, setItens] = useState([])
   const [busca, setBusca] = useState('')
   const [edit, setEdit] = useState(null)
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
+  const [arquivadas, setArquivadas] = useState(false)
 
   async function carregar() {
     setCarregando(true)
-    const { data, error } = await supabase.from(tabela).select('*').eq(flag, true).order('nome').limit(5000)
+    const { data, error } = await supabase.from(tabela).select('*').eq(flag, !arquivadas).order('nome').limit(5000)
     if (error) setErro('Não foi possível carregar: ' + error.message)
     else { setItens(data); setErro('') }
     setCarregando(false)
   }
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { carregar() }, [arquivadas])
 
   async function salvar(v) {
     setSalvando(true)
@@ -115,20 +123,31 @@ function Lista({ tabela, flag, campos, vazio, prepara, linha, novoRotulo, inicia
     carregar()
   }
 
+  async function restaurar(id) {
+    const { error } = await supabase.from(tabela).update({ [flag]: true }).eq('id', id)
+    if (error) return setErro('Não foi possível restaurar: ' + error.message)
+    carregar()
+  }
+
   const q = semAcento(busca)
   const filtrados = itens.filter((i) => semAcento(i.nome).includes(q) || soDigitos(i.telefone).includes(soDigitos(busca) || '§'))
   return (
     <section>
       <div className="barra">
-        <input type="search" placeholder="Buscar por nome ou telefone" value={busca} onChange={(e) => setBusca(e.target.value)} />
+        <input type="search" placeholder={busque} value={busca} onChange={(e) => setBusca(e.target.value)} />
         <button className="primario" onClick={() => { setErro(''); setEdit(inicialNovo) }}>{novoRotulo}</button>
       </div>
-      <p className="contagem">{carregando ? 'Carregando…' : `${filtrados.length} de ${itens.length}`}</p>
+      <div className="meta">
+        <p className="contagem">{carregando ? 'Carregando…' : `${filtrados.length} de ${itens.length}${arquivadas ? ' arquivadas' : ''}`}</p>
+        <button className="texto" onClick={() => { setBusca(''); setArquivadas(!arquivadas) }}>{arquivadas ? 'Voltar para as ativas' : 'Ver arquivadas'}</button>
+      </div>
       {erro && !edit && <p className="erro">{erro}</p>}
-      {!carregando && itens.length === 0 && <p className="vazio">{vazio}</p>}
+      {!carregando && itens.length === 0 && <p className="vazio">{arquivadas ? 'Nada arquivado por aqui.' : vazio}</p>}
       <ul className="itens">
         {filtrados.map((i) => (
-          <li key={i.id} onClick={() => { setErro(''); setEdit(i) }}>{linha(i)}</li>
+          arquivadas
+            ? <li key={i.id} className="arq"><div><strong>{i.nome}</strong></div><button onClick={() => restaurar(i.id)}>Restaurar</button></li>
+            : <li key={i.id} onClick={() => { setErro(''); setEdit(i) }}>{linha(i)}</li>
         ))}
       </ul>
       {edit && <Formulario campos={campos} inicial={edit} onSalvar={salvar} onCancelar={() => setEdit(null)} onArquivar={arquivar} salvando={salvando} erro={erro} />}
@@ -169,18 +188,18 @@ export default function App() {
       </nav>
       {aba === 'clientes' ? (
         <Lista key="c" tabela="clientes" flag="ativa" campos={CAMPOS_CLIENTE} prepara={prepCliente}
-          novoRotulo="Nova cliente" inicialNovo={{ nome: '' }}
+          busque="Buscar cliente" novoRotulo="Nova cliente" inicialNovo={{ nome: '' }}
           vazio="Nenhuma cliente ainda. Toque em “Nova cliente” para cadastrar."
           linha={(c) => (
             <>
               <div><strong>{c.nome}</strong>
-                <small>{c.telefone ? c.telefone : 'sem telefone'}{c.telefone_incompleto ? ' · falta DDD' : ''}{c.ultimo_atendimento ? ` · último: ${dataBR(c.ultimo_atendimento)}` : ''}</small></div>
+                <small>{c.telefone ? fmtTel(c.telefone) : 'sem telefone'}{c.telefone_incompleto ? ' · falta DDD' : ''}{c.ultimo_atendimento ? ` · último: ${dataBR(c.ultimo_atendimento)}` : ''}</small></div>
               {c.telefone && !c.telefone_incompleto && <a className="zap" href={zap(c.telefone)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>WhatsApp</a>}
             </>
           )} />
       ) : (
         <Lista key="s" tabela="servicos" flag="ativo" campos={CAMPOS_SERVICO} prepara={prepServico}
-          novoRotulo="Novo serviço" inicialNovo={{ nome: '', preco: '', duracao_min: 60 }}
+          busque="Buscar serviço" novoRotulo="Novo serviço" inicialNovo={{ nome: '', preco: '', duracao_min: 60 }}
           vazio="Nenhum serviço ainda. Cadastre alongamento, manutenção, esmaltação…"
           linha={(s) => (<div><strong>{s.nome}</strong><small>{brl(s.preco)} · {s.duracao_min} min</small></div>)} />
       )}

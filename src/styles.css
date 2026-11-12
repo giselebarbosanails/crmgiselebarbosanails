@@ -38,3 +38,7 @@ nav button.ativo{background:var(--rosa-claro);border-color:var(--rosa);font-weig
 .acoes{display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:-20px;background:var(--fundo);padding:12px 0}
 .acoes .primario{flex:1}
 @media(min-width:640px){.fundo{place-items:center}.modal{border-radius:18px}}
+
+.meta{display:flex;justify-content:space-between;align-items:center}
+button.texto{min-height:36px;border:0;background:none;color:var(--rosa);font-weight:600;padding:0 4px}
+.itens li.arq{cursor:default}.itens li.arq:hover{border-color:var(--linha)}
