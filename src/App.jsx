@@ -4,6 +4,7 @@ import Agenda from './Agenda.jsx'
 import Financeiro from './Financeiro.jsx'
 import Painel from './Painel.jsx'
 import Datas from './Datas.jsx'
+import Estudio from './Estudio.jsx'
 
 const soDigitos = (t) => (t || '').replace(/\D/g, '')
 const zap = (t) => 'https://wa.me/' + soDigitos(t)
@@ -16,6 +17,7 @@ const fmtTel = (t) => {
   if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
   return t || ''
 }
+const lerNome = () => { try { return localStorage.getItem('nomeEstudio') || 'Studio Nails' } catch { return 'Studio Nails' } }
 const semAcento = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
 const CAMPOS_CLIENTE = [
@@ -53,7 +55,7 @@ function Login() {
   return (
     <main className="login">
       <form onSubmit={entrar}>
-        <h1>Studio Nails</h1>
+        <h1>{lerNome()}</h1>
         <p>Entre para ver suas clientes e serviços.</p>
         <label>E-mail<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" /></label>
         <label>Senha<input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required autoComplete="current-password" /></label>
@@ -179,14 +181,25 @@ export default function App() {
     const { data } = supabase.auth.onAuthStateChange((_e, s) => setSessao(s))
     return () => data.subscription.unsubscribe()
   }, [])
+  const [nome, setNome] = useState(lerNome())
+  const [verEstudio, setVerEstudio] = useState(false)
+  const mudarNome = (n) => { setNome(n); document.title = n; try { localStorage.setItem('nomeEstudio', n) } catch { /* sem armazenamento */ } }
+  useEffect(() => {
+    if (!sessao) return
+    supabase.from('estudio').select('nome').eq('id', 1).maybeSingle().then(({ data }) => { if (data?.nome) mudarNome(data.nome) })
+  }, [sessao])
   if (sessao === undefined) return <p className="vazio">Carregando…</p>
   if (!sessao) return <Login />
   return (
     <div className="app">
       <header>
-        <h1>Studio Nails</h1>
-        <button onClick={() => supabase.auth.signOut()}>Sair</button>
+        <button className="marca" onClick={() => window.location.reload()} title="Voltar ao início e atualizar">{nome}</button>
+        <div className="topo">
+          <button onClick={() => setVerEstudio(!verEstudio)} aria-label="Meu estúdio" title="Meu estúdio">⚙</button>
+          <button onClick={() => supabase.auth.signOut()}>Sair</button>
+        </div>
       </header>
+      {verEstudio ? <Estudio onVoltar={() => setVerEstudio(false)} onSalvo={mudarNome} /> : <>
       <nav>
         <button className={aba === 'painel' ? 'ativo' : ''} onClick={() => setAba('painel')}>Painel</button>
         <button className={aba === 'agenda' ? 'ativo' : ''} onClick={() => setAba('agenda')}>Agenda</button>
@@ -217,6 +230,7 @@ export default function App() {
           vazio="Nenhum serviço ainda. Cadastre alongamento, manutenção, esmaltação…"
           linha={(s) => (<div><strong>{s.nome}</strong><small>{brl(s.preco)} · {s.duracao_min} min</small></div>)} />
       )}
+      </>}
     </div>
   )
 }

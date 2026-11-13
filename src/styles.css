@@ -68,3 +68,7 @@ h3{font-family:Georgia,serif;margin:20px 0 8px}
 
 .itens li.dados{display:block;cursor:default}.itens li.dados:hover{border-color:var(--linha)}
 .duas{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}.duas label{margin:0}
+
+button.marca{border:0;background:none;padding:0;min-height:44px;font:700 1.6rem Georgia,'Times New Roman',serif;color:var(--rosa);text-align:left}
+.topo{display:flex;gap:8px}
+.ok{color:#1f6b3f;background:#dcefe4;padding:8px 12px;border-radius:8px;margin:8px 0}
