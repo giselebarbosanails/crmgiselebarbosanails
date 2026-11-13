@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import Agenda from './Agenda.jsx'
 import Financeiro from './Financeiro.jsx'
 import Painel from './Painel.jsx'
+import Datas from './Datas.jsx'
 
 const soDigitos = (t) => (t || '').replace(/\D/g, '')
 const zap = (t) => 'https://wa.me/' + soDigitos(t)
@@ -172,6 +173,7 @@ const prepServico = (v) => ({ ...v, nome: v.nome.trim(), preco: Number(v.preco |
 export default function App() {
   const [sessao, setSessao] = useState(undefined)
   const [aba, setAba] = useState('painel')
+  const [vistaCli, setVistaCli] = useState('lista')
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSessao(data.session))
     const { data } = supabase.auth.onAuthStateChange((_e, s) => setSessao(s))
@@ -193,7 +195,12 @@ export default function App() {
         <button className={aba === 'financeiro' ? 'ativo' : ''} onClick={() => setAba('financeiro')}>Financeiro</button>
       </nav>
       {aba === 'painel' ? <Painel /> : aba === 'agenda' ? <Agenda /> : aba === 'financeiro' ? <Financeiro /> : aba === 'clientes' ? (
-        <Lista key="c" tabela="clientes" flag="ativa" campos={CAMPOS_CLIENTE} prepara={prepCliente}
+        <>
+        <div className="filtros">
+          <button className={vistaCli === 'lista' ? 'ativo' : ''} onClick={() => setVistaCli('lista')}>Lista</button>
+          <button className={vistaCli === 'datas' ? 'ativo' : ''} onClick={() => setVistaCli('datas')}>Preencher datas</button>
+        </div>
+        {vistaCli === 'datas' ? <Datas /> : <Lista key="c" tabela="clientes" flag="ativa" campos={CAMPOS_CLIENTE} prepara={prepCliente}
           busque="Buscar cliente" novoRotulo="Nova cliente" inicialNovo={{ nome: '' }}
           vazio="Nenhuma cliente ainda. Toque em “Nova cliente” para cadastrar."
           linha={(c) => (
@@ -202,7 +209,8 @@ export default function App() {
                 <small>{c.telefone ? fmtTel(c.telefone) : 'sem telefone'}{c.telefone_incompleto ? ' · falta DDD' : ''}{c.ultimo_atendimento ? ` · último: ${dataBR(c.ultimo_atendimento)}` : ''}</small></div>
               {c.telefone && !c.telefone_incompleto && <a className="zap" href={zap(c.telefone)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>WhatsApp</a>}
             </>
-          )} />
+          )} />}
+        </>
       ) : (
         <Lista key="s" tabela="servicos" flag="ativo" campos={CAMPOS_SERVICO} prepara={prepServico}
           busque="Buscar serviço" novoRotulo="Novo serviço" inicialNovo={{ nome: '', preco: '', duracao_min: 60 }}

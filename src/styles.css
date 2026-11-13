@@ -65,3 +65,6 @@ h3{font-family:Georgia,serif;margin:20px 0 8px}
 .filtros button{flex:1;padding:0 4px;font-size:.88rem}
 .filtros button.ativo{background:var(--rosa-claro);border-color:var(--rosa);font-weight:600}
 @media(max-width:480px){nav button{font-size:.76rem}}
+
+.itens li.dados{display:block;cursor:default}.itens li.dados:hover{border-color:var(--linha)}
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}.duas label{margin:0}
