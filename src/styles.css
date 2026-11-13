@@ -60,3 +60,8 @@ label.chk{display:flex;align-items:center;gap:8px;margin:0;color:var(--tinta)}la
 .cards small{display:block;color:var(--suave)}.cards strong{font-size:1.15rem}
 h3{font-family:Georgia,serif;margin:20px 0 8px}
 .itens li span button{min-height:32px;padding:0 8px;margin-left:6px}
+
+.filtros{display:flex;gap:6px;margin-bottom:10px}
+.filtros button{flex:1;padding:0 4px;font-size:.88rem}
+.filtros button.ativo{background:var(--rosa-claro);border-color:var(--rosa);font-weight:600}
+@media(max-width:480px){nav button{font-size:.76rem}}
