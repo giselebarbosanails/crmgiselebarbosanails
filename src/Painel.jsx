@@ -42,7 +42,7 @@ export default function Painel() {
       supabase.from('agendamentos').select('cliente_id').in('status', ['agendado', 'confirmado']).gte('inicio', h.toISOString()),
       supabase.from('pagamentos').select('valor,pago_em').gte('pago_em', mes0).lt('pago_em', mes1),
       supabase.from('agendamentos').select('id', { count: 'exact', head: true }).in('status', ['agendado', 'confirmado', 'concluido']).gte('inicio', sem0.toISOString()).lt('inicio', sem7.toISOString()),
-      supabase.from('agendamentos').select('id,inicio,status,cliente_id,clientes(nome,telefone,telefone_incompleto)').in('status', ['cancelado', 'faltou']).gte('inicio', ult30.toISOString()).lte('inicio', h.toISOString()).order('inicio', { ascending: false }),
+      supabase.from('agendamentos').select('id,inicio,status,cliente_id,clientes(nome,telefone,telefone_incompleto)').in('status', ['cancelado', 'faltou']).gte('inicio', ult30.toISOString()).order('inicio', { ascending: false }),
     ])
     const e = c.error || hoje.error || fut.error || p.error || sem.error || fal.error
     if (e) return setErro('Não foi possível carregar o painel: ' + e.message)
