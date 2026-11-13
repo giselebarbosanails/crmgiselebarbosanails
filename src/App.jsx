@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import Agenda from './Agenda.jsx'
+import Financeiro from './Financeiro.jsx'
 
 const soDigitos = (t) => (t || '').replace(/\D/g, '')
 const zap = (t) => 'https://wa.me/' + soDigitos(t)
@@ -168,7 +170,7 @@ const prepServico = (v) => ({ ...v, nome: v.nome.trim(), preco: Number(v.preco |
 
 export default function App() {
   const [sessao, setSessao] = useState(undefined)
-  const [aba, setAba] = useState('clientes')
+  const [aba, setAba] = useState('agenda')
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSessao(data.session))
     const { data } = supabase.auth.onAuthStateChange((_e, s) => setSessao(s))
@@ -183,10 +185,12 @@ export default function App() {
         <button onClick={() => supabase.auth.signOut()}>Sair</button>
       </header>
       <nav>
+        <button className={aba === 'agenda' ? 'ativo' : ''} onClick={() => setAba('agenda')}>Agenda</button>
         <button className={aba === 'clientes' ? 'ativo' : ''} onClick={() => setAba('clientes')}>Clientes</button>
         <button className={aba === 'servicos' ? 'ativo' : ''} onClick={() => setAba('servicos')}>Serviços</button>
+        <button className={aba === 'financeiro' ? 'ativo' : ''} onClick={() => setAba('financeiro')}>Financeiro</button>
       </nav>
-      {aba === 'clientes' ? (
+      {aba === 'agenda' ? <Agenda /> : aba === 'financeiro' ? <Financeiro /> : aba === 'clientes' ? (
         <Lista key="c" tabela="clientes" flag="ativa" campos={CAMPOS_CLIENTE} prepara={prepCliente}
           busque="Buscar cliente" novoRotulo="Nova cliente" inicialNovo={{ nome: '' }}
           vazio="Nenhuma cliente ainda. Toque em “Nova cliente” para cadastrar."
