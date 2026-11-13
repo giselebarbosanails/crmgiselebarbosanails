@@ -44,7 +44,7 @@ export default function Financeiro() {
   const fat = soma(pag), dsp = soma(des)
   const porForma = Object.entries(FORMA).map(([k, n]) => [n, soma(pag.filter((p) => p.forma === k))])
   const srv = {}
-  pag.forEach((p) => { const n = p.servico_nome || 'Sem serviço'; srv[n] = srv[n] || { q: 0, v: 0 }; if (p.tipo !== 'sinal') srv[n].q++; srv[n].v += Number(p.valor) })
+  pag.forEach((p) => { const n = p.servico_nome || 'Sem serviço'; srv[n] = srv[n] || { q: 0, v: 0 }; if (p.tipo === 'total' || p.tipo === 'restante') srv[n].q++; srv[n].v += Number(p.valor) })
   const ranking = Object.entries(srv).sort((a, b) => b[1].v - a[1].v)
 
   return (

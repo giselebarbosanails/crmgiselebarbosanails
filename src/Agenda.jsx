@@ -123,6 +123,7 @@ export default function Agenda() {
   const [modal, setModal] = useState(null)
   const [erro, setErro] = useState('')
   const [busy, setBusy] = useState(false)
+  const [aviso, setAviso] = useState('')
 
   async function carregarBase() {
     const [c, s, p] = await Promise.all([
@@ -155,7 +156,7 @@ export default function Agenda() {
   const d0 = new Date(base); d0.setDate(d0.getDate() - d0.getDay())
   const dias = [...Array(7)].map((_, i) => { const d = new Date(d0); d.setDate(d.getDate() + i); return d })
   const mover = (n) => { const d = new Date(base); d.setDate(d.getDate() + n); setDia(ymd(d)) }
-  const abrir = (m) => { setErro(''); setModal(m) }
+  const abrir = (m) => { setErro(''); setAviso(''); setModal(m) }
 
   async function salvar(v) {
     setErro('')
@@ -183,15 +184,15 @@ export default function Agenda() {
       error = r.error; id = r.data?.id
     }
     if (error) { setBusy(false); return setErro('Não foi possível salvar: ' + error.message) }
-    let aviso = ''
+    let av = ''
     if (sinalNovo > 0) {
       const r2 = await supabase.from('pagamentos').insert({ agendamento_id: id, cliente_id: v.cliente_id, valor: sinalNovo, forma: v.forma_sinal || 'pix', servico_nome: sv.nome, pago_em: ymd(new Date()), tipo: 'sinal' })
-      if (r2.error) aviso = 'O agendamento foi salvo, mas o sinal não foi registrado: ' + r2.error.message
+      if (r2.error) av = 'O agendamento foi salvo, mas o sinal não foi registrado: ' + r2.error.message
       else await supabase.from('agendamentos').update({ sinal_valor: sinalNovo }).eq('id', id)
     }
     setBusy(false)
     setModal(null)
-    if (aviso) setErro(aviso)
+    setAviso(av)
     if (ymd(ini) === dia) carregarDia(); else setDia(ymd(ini))
   }
   async function mudar(x, st) {
@@ -253,6 +254,7 @@ export default function Agenda() {
       </div>
       <p className="contagem">{base.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })} · {itens.filter((i) => i.status !== 'cancelado').length} atendimento(s)</p>
       {erro && !modal && <p className="erro">{erro}</p>}
+      {aviso && !modal && <p className="erro">{aviso}</p>}
       {itens.length === 0 && <p className="vazio">Nada marcado para este dia. Toque em “Novo agendamento”.</p>}
       <ul className="itens">
         {itens.map((i) => (
