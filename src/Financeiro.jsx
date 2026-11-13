@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { brl, ymd, dataBR } from './util'
+import Relatorios from './Relatorios.jsx'
 
 const FORMA = { pix: 'Pix', dinheiro: 'Dinheiro', cartao: 'Cartão' }
 const soma = (l) => l.reduce((t, i) => t + Number(i.valor || 0), 0)
 
-export default function Financeiro() {
+function Resumo() {
   const [mes, setMes] = useState(ymd(new Date()).slice(0, 7))
   const [pag, setPag] = useState([])
   const [des, setDes] = useState([])
@@ -83,5 +84,18 @@ export default function Financeiro() {
         </div>
       )}
     </section>
+  )
+}
+
+export default function Financeiro() {
+  const [vista, setVista] = useState('mes')
+  return (
+    <>
+      <div className="filtros">
+        <button className={vista === 'mes' ? 'ativo' : ''} onClick={() => setVista('mes')}>Mês</button>
+        <button className={vista === 'rel' ? 'ativo' : ''} onClick={() => setVista('rel')}>Relatórios</button>
+      </div>
+      {vista === 'mes' ? <Resumo /> : <Relatorios />}
+    </>
   )
 }
