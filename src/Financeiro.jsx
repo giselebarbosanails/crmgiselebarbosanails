@@ -44,7 +44,7 @@ export default function Financeiro() {
   const fat = soma(pag), dsp = soma(des)
   const porForma = Object.entries(FORMA).map(([k, n]) => [n, soma(pag.filter((p) => p.forma === k))])
   const srv = {}
-  pag.forEach((p) => { const n = p.servico_nome || 'Sem serviço'; srv[n] = srv[n] || { q: 0, v: 0 }; srv[n].q++; srv[n].v += Number(p.valor) })
+  pag.forEach((p) => { const n = p.servico_nome || 'Sem serviço'; srv[n] = srv[n] || { q: 0, v: 0 }; if (p.tipo !== 'sinal') srv[n].q++; srv[n].v += Number(p.valor) })
   const ranking = Object.entries(srv).sort((a, b) => b[1].v - a[1].v)
 
   return (
@@ -65,7 +65,7 @@ export default function Financeiro() {
       {ranking.length === 0 && <p className="vazio">Sem atendimentos pagos neste mês.</p>}
       <ul className="itens">{ranking.map(([n, r]) => <li key={n} className="arq"><div><strong>{n}</strong><small>{r.q} atendimento(s)</small></div><span>{brl(r.v)}</span></li>)}</ul>
       <h3>Recebimentos</h3>
-      <ul className="itens">{pag.map((p) => <li key={p.id} className="arq"><div><strong>{p.clientes?.nome || 'Cliente'}</strong><small>{dataBR(p.pago_em)} · {p.servico_nome} · {FORMA[p.forma]}</small></div><span>{brl(p.valor)}</span></li>)}</ul>
+      <ul className="itens">{pag.map((p) => <li key={p.id} className="arq"><div><strong>{p.clientes?.nome || 'Cliente'}</strong><small>{dataBR(p.pago_em)} · {p.servico_nome} · {FORMA[p.forma]}{p.tipo === 'sinal' ? ' · sinal' : p.tipo === 'devolucao' ? ' · devolução' : ''}</small></div><span>{brl(p.valor)}</span></li>)}</ul>
       <h3>Despesas</h3>
       {des.length === 0 && <p className="vazio">Nenhuma despesa neste mês.</p>}
       <ul className="itens">{des.map((d) => <li key={d.id} className="arq"><div><strong>{d.descricao}</strong><small>{dataBR(d.data)}{d.categoria ? ' · ' + d.categoria : ''}</small></div><span>{brl(d.valor)} <button onClick={() => apagar(d.id)} aria-label="Apagar despesa">✕</button></span></li>)}</ul>

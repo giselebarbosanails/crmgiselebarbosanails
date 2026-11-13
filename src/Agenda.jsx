@@ -41,6 +41,21 @@ function FormAgenda({ inicial, clientes, servicos, onSalvar, onCancelar, erro, b
         </label>
         <label>Data e hora<input type="datetime-local" required value={v.inicio} onChange={(e) => set('inicio', e.target.value)} /></label>
         <label>Valor (R$)<input type="number" min="0" step="0.01" required value={v.valor ?? ''} onChange={(e) => set('valor', e.target.value)} /></label>
+        {Number(v.sinal_valor) > 0 ? <p className="contagem">Sinal de {brl(v.sinal_valor)} já recebido.</p> : (
+          <>
+            <label className="chk"><input type="checkbox" checked={!!v.cobrar} onChange={(e) => setV((o) => ({ ...o, cobrar: e.target.checked, sinal: o.sinal ?? Math.round(Number(o.valor || 0) * 30) / 100 }))} />Cobrar sinal</label>
+            {v.cobrar && (
+              <>
+                <label>Sinal (R$) · sugerido: 30%<input type="number" min="0" step="0.01" required value={v.sinal ?? ''} onChange={(e) => set('sinal', e.target.value)} /></label>
+                <label>Forma do sinal
+                  <select value={v.forma_sinal || 'pix'} onChange={(e) => set('forma_sinal', e.target.value)}>
+                    <option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option>
+                  </select>
+                </label>
+              </>
+            )}
+          </>
+        )}
         <label>Observações<textarea rows="2" value={v.observacoes ?? ''} onChange={(e) => set('observacoes', e.target.value)} /></label>
         {erro && <p className="erro">{erro}</p>}
         <div className="acoes">
@@ -54,11 +69,12 @@ function FormAgenda({ inicial, clientes, servicos, onSalvar, onCancelar, erro, b
 
 function FormPagar({ item, onPagar, onCancelar, erro, busy }) {
   const [forma, setForma] = useState('pix')
-  const [valor, setValor] = useState(item.valor)
+  const [valor, setValor] = useState(Math.max(0, Number(item.valor) - Number(item.sinal_valor || 0)))
   return (
     <Modal titulo="Receber pagamento" onClose={onCancelar}>
       <form onSubmit={(e) => { e.preventDefault(); onPagar({ forma, valor }) }}>
         <p>{item.clientes?.nome} · {item.servicos?.nome}</p>
+        {Number(item.sinal_valor) > 0 && <p className="contagem">Sinal de {brl(item.sinal_valor)} já recebido. O valor sugerido é o restante.</p>}
         <label>Forma de pagamento
           <select value={forma} onChange={(e) => setForma(e.target.value)}>
             <option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option>
@@ -146,6 +162,8 @@ export default function Agenda() {
     const sv = servicos.find((s) => s.id === v.servico_id)
     if (!v.cliente_id || !sv || !v.inicio) return setErro('Escolha a cliente, o serviço e o horário.')
     const ini = new Date(v.inicio), fim = new Date(ini.getTime() + sv.duracao_min * 60000)
+    const sinalNovo = v.cobrar ? Number(v.sinal || 0) : 0
+    if (sinalNovo > Number(v.valor || 0)) return setErro('O sinal não pode ser maior que o valor do serviço.')
     setBusy(true)
     const { data: choques } = await supabase.from('agendamentos').select('id,inicio,clientes(nome)')
       .not('status', 'in', '(cancelado,faltou)').lt('inicio', fim.toISOString()).gt('fim', ini.toISOString())
@@ -158,17 +176,32 @@ export default function Agenda() {
       if (fora && !window.confirm('Esse horário está fora do horário habitual. Agendar mesmo assim?')) return setBusy(false)
     }
     const dados = { cliente_id: v.cliente_id, servico_id: v.servico_id, inicio: ini.toISOString(), fim: fim.toISOString(), valor: Number(v.valor || 0), observacoes: v.observacoes || null }
-    const { error } = v.id
-      ? await supabase.from('agendamentos').update(dados).eq('id', v.id)
-      : await supabase.from('agendamentos').insert({ ...dados, status: 'agendado' })
+    let id = v.id, error
+    if (id) ({ error } = await supabase.from('agendamentos').update(dados).eq('id', id))
+    else {
+      const r = await supabase.from('agendamentos').insert({ ...dados, status: 'agendado' }).select('id').single()
+      error = r.error; id = r.data?.id
+    }
+    if (error) { setBusy(false); return setErro('Não foi possível salvar: ' + error.message) }
+    let aviso = ''
+    if (sinalNovo > 0) {
+      const r2 = await supabase.from('pagamentos').insert({ agendamento_id: id, cliente_id: v.cliente_id, valor: sinalNovo, forma: v.forma_sinal || 'pix', servico_nome: sv.nome, pago_em: ymd(new Date()), tipo: 'sinal' })
+      if (r2.error) aviso = 'O agendamento foi salvo, mas o sinal não foi registrado: ' + r2.error.message
+      else await supabase.from('agendamentos').update({ sinal_valor: sinalNovo }).eq('id', id)
+    }
     setBusy(false)
-    if (error) return setErro('Não foi possível salvar: ' + error.message)
     setModal(null)
+    if (aviso) setErro(aviso)
     if (ymd(ini) === dia) carregarDia(); else setDia(ymd(ini))
   }
-  async function mudar(id, st) {
+  async function mudar(x, st) {
     if (st === 'cancelado' && !window.confirm('Cancelar este agendamento?')) return
-    const { error } = await supabase.from('agendamentos').update({ status: st }).eq('id', id)
+    const sinal = Number(x.sinal_valor || 0)
+    if (st !== 'confirmado' && sinal > 0 && window.confirm(`Devolver o sinal de ${brl(sinal)} à cliente?\n\nOK = devolver (sai do faturamento)\nCancelar = ficar com o sinal`)) {
+      const { data: sp } = await supabase.from('pagamentos').select('forma').eq('agendamento_id', x.id).eq('tipo', 'sinal').limit(1)
+      await supabase.from('pagamentos').insert({ agendamento_id: x.id, cliente_id: x.cliente_id, valor: -sinal, forma: sp?.[0]?.forma || 'pix', servico_nome: x.servicos?.nome, pago_em: ymd(new Date()), tipo: 'devolucao' })
+    }
+    const { error } = await supabase.from('agendamentos').update({ status: st }).eq('id', x.id)
     if (error) return setErro('Não foi possível atualizar: ' + error.message)
     setModal(null); carregarDia()
   }
@@ -178,7 +211,7 @@ export default function Agenda() {
     if (v.valor === '' || !(valor >= 0)) return setErro('Informe o valor recebido.')
     setBusy(true)
     const data = ymd(item.inicio)
-    const r = await supabase.from('pagamentos').insert({ agendamento_id: item.id, cliente_id: item.cliente_id, valor, forma: v.forma, servico_nome: item.servicos?.nome, pago_em: data })
+    const r = await supabase.from('pagamentos').insert({ agendamento_id: item.id, cliente_id: item.cliente_id, valor, forma: v.forma, servico_nome: item.servicos?.nome, pago_em: data, tipo: Number(item.sinal_valor) > 0 ? 'restante' : 'total' })
     if (r.error) { setBusy(false); return setErro('Não foi possível registrar: ' + r.error.message) }
     await supabase.from('agendamentos').update({ status: 'concluido' }).eq('id', item.id)
     const cl = clientes.find((c) => c.id === item.cliente_id)
@@ -198,6 +231,7 @@ export default function Agenda() {
 
   const novo = { inicio: `${dia}T09:00`, valor: '' }
   const x = modal?.x
+  const ja = x && new Date(x.inicio) <= new Date()
   return (
     <section>
       <div className="barra">
@@ -223,7 +257,7 @@ export default function Agenda() {
       <ul className="itens">
         {itens.map((i) => (
           <li key={i.id} onClick={() => abrir({ t: 'ver', x: i })}>
-            <div><strong>{hora(i.inicio)}–{hora(i.fim)} · {i.clientes?.nome}</strong><small>{i.servicos?.nome} · {brl(i.valor)}</small></div>
+            <div><strong>{hora(i.inicio)}–{hora(i.fim)} · {i.clientes?.nome}</strong><small>{i.servicos?.nome} · {brl(i.valor)}{Number(i.sinal_valor) > 0 ? ` · sinal ${brl(i.sinal_valor)} pago` : ''}</small></div>
             <span className={'badge ' + i.status}>{STATUS[i.status]}</span>
           </li>
         ))}
@@ -235,14 +269,16 @@ export default function Agenda() {
         <Modal titulo={x.clientes?.nome} onClose={() => setModal(null)}>
           <p>{x.servicos?.nome} · {hora(x.inicio)}–{hora(x.fim)} · {brl(x.valor)}</p>
           <p><span className={'badge ' + x.status}>{STATUS[x.status]}</span></p>
+          {Number(x.sinal_valor) > 0 && <p>Sinal {brl(x.sinal_valor)} pago · falta {brl(x.valor - x.sinal_valor)}</p>}
+          {!ja && ['agendado', 'confirmado'].includes(x.status) && <p className="contagem">Concluir e marcar falta ficam disponíveis a partir de {hora(x.inicio)} do dia {new Date(x.inicio).toLocaleDateString('pt-BR')}.</p>}
           {x.observacoes && <p className="contagem">{x.observacoes}</p>}
           {erro && <p className="erro">{erro}</p>}
           <div className="botoes">
-            {x.status === 'agendado' && <button onClick={() => mudar(x.id, 'confirmado')}>Confirmar</button>}
-            {['agendado', 'confirmado'].includes(x.status) && <button className="primario" onClick={() => abrir({ t: 'pagar', x })}>Concluir e receber</button>}
+            {x.status === 'agendado' && <button onClick={() => mudar(x, 'confirmado')}>Confirmar</button>}
+            {['agendado', 'confirmado'].includes(x.status) && <button className="primario" disabled={!ja} onClick={() => abrir({ t: 'pagar', x })}>Concluir e receber</button>}
             {['agendado', 'confirmado'].includes(x.status) && <button onClick={() => abrir({ t: 'form', v: { ...x, inicio: paraInput(x.inicio) } })}>Remarcar ou editar</button>}
-            {['agendado', 'confirmado'].includes(x.status) && <button onClick={() => mudar(x.id, 'faltou')}>Marcar falta</button>}
-            {['agendado', 'confirmado'].includes(x.status) && <button className="perigo" onClick={() => mudar(x.id, 'cancelado')}>Cancelar</button>}
+            {['agendado', 'confirmado'].includes(x.status) && <button disabled={!ja} onClick={() => mudar(x, 'faltou')}>Marcar falta</button>}
+            {['agendado', 'confirmado'].includes(x.status) && <button className="perigo" onClick={() => mudar(x, 'cancelado')}>Cancelar</button>}
             <button onClick={() => setModal(null)}>Fechar</button>
           </div>
         </Modal>
