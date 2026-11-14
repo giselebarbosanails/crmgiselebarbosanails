@@ -5,6 +5,7 @@ import Financeiro from './Financeiro.jsx'
 import Painel from './Painel.jsx'
 import Datas from './Datas.jsx'
 import Estudio from './Estudio.jsx'
+import Campanhas from './Campanhas.jsx'
 
 const soDigitos = (t) => (t || '').replace(/\D/g, '')
 const zap = (t) => 'https://wa.me/' + soDigitos(t)
@@ -212,8 +213,9 @@ export default function App() {
         <div className="filtros">
           <button className={vistaCli === 'lista' ? 'ativo' : ''} onClick={() => setVistaCli('lista')}>Lista</button>
           <button className={vistaCli === 'datas' ? 'ativo' : ''} onClick={() => setVistaCli('datas')}>Preencher datas</button>
+          <button className={vistaCli === 'camp' ? 'ativo' : ''} onClick={() => setVistaCli('camp')}>Campanhas</button>
         </div>
-        {vistaCli === 'datas' ? <Datas /> : <Lista key="c" tabela="clientes" flag="ativa" campos={CAMPOS_CLIENTE} prepara={prepCliente}
+        {vistaCli === 'datas' ? <Datas /> : vistaCli === 'camp' ? <Campanhas /> : <Lista key="c" tabela="clientes" flag="ativa" campos={CAMPOS_CLIENTE} prepara={prepCliente}
           busque="Buscar cliente" novoRotulo="Nova cliente" inicialNovo={{ nome: '' }}
           vazio="Nenhuma cliente ainda. Toque em “Nova cliente” para cadastrar."
           linha={(c) => (
